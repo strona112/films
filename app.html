@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Twoje Filmy — Aplikacja</title>
+<style>
+:root{
+  --bg1:#040405; --bg2:#0b0c10;
+  --text:#eef2f6; --muted:#97a3b6;
+  --card:rgba(255,255,255,0.03);
+  --radius:14px;
+  --ease:cubic-bezier(.2,.9,.3,1);
+}
+* { box-sizing: border-box; }
+body {
+  margin:0; background:linear-gradient(180deg,var(--bg1),var(--bg2));
+  font-family:Inter,system-ui,Arial; color:var(--text); -webkit-font-smoothing:antialiased;
+}
+header {
+  padding:18px;
+  display:flex; align-items:center; justify-content:space-between;
+  border-bottom:1px solid rgba(255,255,255,0.05);
+}
+.h-left { display:flex; align-items:center; gap:12px; }
+.profile-icon {
+  width:52px; height:52px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:26px; box-shadow:0 14px 40px rgba(0,0,0,0.6);
+}
+.btn {
+  background:var(--accent); border:none; padding:10px 14px; color:white;
+  border-radius:10px; cursor:pointer; font-weight:600;
+}
+.container {
+  max-width:1000px; margin:0 auto; padding:18px;
+}
+
+/* add movie btn */
+#addMovieBtn {
+  background:linear-gradient(90deg,var(--accent),var(--accent2));
+  color:white; cursor:pointer; border:none;
+  padding:12px 18px; border-radius:12px; margin:10px 0;
+}
+
+/* movie cards */
+.movies {
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
+  gap:16px; margin-top:20px;
+}
+.movie {
+  background:var(--card); border-radius:var(--radius); padding:14px;
+  border:1px solid rgba(255,255,255,0.05); box-shadow:0 30px 80px rgba(2,6,23,0.4);
+  transition:transform .3s var(--ease), opacity .3s var(--ease);
+}
+.movie:hover { transform:translateY(-6px); }
+.thumb {
+  width:100%; height:150px; object-fit:cover; border-radius:10px; margin-bottom:10px;
+}
+
+/* modal */
+.modal-bg {
+  position:fixed; inset:0; background:rgba(0,0,0,0.6);
+  display:flex; align-items:center; justify-content:center; z-index:20;
+}
+.modal {
+  width:100%; max-width:650px; background:#0d1117;
+  padding:24px; border-radius:16px;
+  border:1px solid rgba(255,255,255,0.05);
+  animation:pop .4s var(--ease);
+}
+@keyframes pop {
+  0% { transform:scale(.94); opacity:0; }
+  100% { transform:scale(1); opacity:1; }
+}
+.input, textarea {
+  width:100%; border:1px solid rgba(255,255,255,0.06);
+  background:transparent; padding:10px; border-radius:8px; color:var(--text);
+  margin-bottom:10px;
+}
+textarea { min-height:90px; resize:vertical; }
+
+select { padding:10px; border-radius:8px; background:#111; color:var(--text); border:1px solid rgba(255,255,255,0.06); }
+
+.action-row { display:flex; justify-content:flex-end; gap:12px; }
+
+/* fade animation */
+.fade-in { opacity:0; transform:translateY(8px); animation:fade .45s forwards; }
+@keyframes fade {
+  to { opacity:1; transform:none; }
+}
+
+/* filter bar */
+.filters {
+  margin-top:10px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;
+}
+.filter-btn {
+  padding:8px 12px; border-radius:8px; background:#111;
+  color:var(--muted); cursor:pointer; border:1px solid rgba(255,255,255,0.05);
+}
+.filter-btn.active {
+  background:var(--accent); color:white;
+}
+
+</style>
+</head>
+<body>
+
+<header>
+  <div class="h-left">
+    <div id="profileIcon" class="profile-icon"></div>
+    <div>
+      <div id="profileName" style="font-size:20px;font-weight:700;"></div>
+      <div id="profileInfo" style="font-size:12px;color:var(--muted);">Twój profil</div>
+    </div>
+  </div>
+
+  <button onclick="goBack()" class="btn" style="background:#222">Zmień profil</button>
+</header>
+
+<div class="container">
+
+  <button id="addMovieBtn">+ Dodaj film</button>
+
+  <!-- filters -->
+  <div class="filters">
+    <div class="filter-btn active" data-filter="all">Wszystkie</div>
+    <div class="filter-btn" data-filter="todo">Do obejrzenia</div>
+    <div class="filter-btn" data-filter="done">Obejrzane</div>
+
+    <select id="sortSelect">
+      <option value="new">Najnowsze</option>
+      <option value="old">Najstarsze</option>
+      <option value="rated">Najwyżej oceniane</option>
+    </select>
+  </div>
+
+  <div class="movies" id="movies"></div>
+</div>
+
+<!-- ========================= MODAL ========================= -->
+<div id="modalBg" class="modal-bg" style="display:none">
+  <div class="modal">
+    <h2 id="modalTitle">Dodaj film</h2>
+
+    <input id="mTitle" class="input" placeholder="Tytuł filmu">
+    <textarea id="mDesc" class="input" placeholder="Opis (opcjonalnie)"></textarea>
+    <input id="mImg" class="input" placeholder="URL miniaturki (opcjonalnie)">
+    <input id="mLink" class="input" placeholder="Link do filmu (opcjonalnie)">
+
+    <label>Status:</label>
+    <select id="mStatus">
+      <option value="todo">Do obejrzenia</option>
+      <option value="done">Obejrzane</option>
+    </select>
+
+    <label>Ocena (1–10, opcjonalnie):</label>
+    <input id="mRate" class="input" type="number" min="1" max="10" placeholder="np. 7">
+
+    <div class="action-row">
+      <button onclick="closeModal()" class="btn" style="background:#222">Anuluj</button>
+      <button onclick="saveMovie()" class="btn">Zapisz</button>
+    </div>
+  </div>
+</div>
+
+<!-- FIREBASE -->
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+
+<script>
+// ---------------- FIREBASE CONFIG ----------------
+const firebaseConfig = {
+  apiKey: "AIzaSyB7lLkah3C6y76fZFWrnnVwIDEqsdi3BN0",
+  authDomain: "filmy-a8f12.firebaseapp.com",
+  projectId: "filmy-a8f12",
+  storageBucket: "filmy-a8f12.appspot.com",
+  messagingSenderId: "641694983734",
+  appId: "1:641694983734:web:ab4a930bb892ce1e7c2bf7",
+  measurementId: "G-XNV7QG88QX"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// ---------------- PROFILE LOAD ----------------
+let profileId = localStorage.getItem("currentProfile");
+let currentProfile = null;
+if (!profileId) location.href = "index.html";
+
+db.collection("profiles").doc(profileId).onSnapshot(doc => {
+  if (!doc.exists) return location.href = "index.html";
+  currentProfile = doc.data();
+  renderProfileHeader();
+});
+
+// ---------------- PROFILE HEADER ----------------
+function renderProfileHeader(){
+  const icon = document.getElementById("profileIcon");
+  const name = document.getElementById("profileName");
+
+  icon.textContent = currentProfile.icon;
+  icon.style.background = `linear-gradient(135deg, ${currentProfile.color}, rgba(0,0,0,0.6))`;
+
+  name.textContent = currentProfile.name;
+
+  document.documentElement.style.setProperty("--accent", currentProfile.color);
+  document.documentElement.style.setProperty("--accent2", shade(currentProfile.color, -20));
+}
+
+// ---------------- GO BACK ----------------
+function goBack(){
+  localStorage.removeItem("currentProfile");
+  location.href = "index.html";
+}
+
+// ---------------- MOVIES REALTIME ----------------
+let movies = [];
+
+db.collection("movies")
+  .where("profileId", "==", profileId)
+  .orderBy("createdAt", "desc")
+  .onSnapshot(snap => {
+    movies = [];
+    snap.forEach(d => movies.push({ id:d.id, ...d.data() }));
+    renderMovies();
+  });
+
+// ---------------- RENDER MOVIES ----------------
+function renderMovies(){
+  const filter = document.querySelector(".filter-btn.active").dataset.filter;
+  const sort = document.getElementById("sortSelect").value;
+
+  let list = [...movies];
+
+  if (filter === "todo") list = list.filter(m => m.status === "todo");
+  if (filter === "done") list = list.filter(m => m.status === "done");
+
+  if (sort === "old") list.reverse();
+  if (sort === "rated") list.sort((a,b)=>(b.rate||0)-(a.rate||0));
+
+  const box = document.getElementById("movies");
+  box.innerHTML = "";
+
+  list.forEach(m => {
+    const div = document.createElement("div");
+    div.className = "movie fade-in";
+
+    div.innerHTML = `
+      <img class="thumb" src="${m.img || 'https://i.imgur.com/sQZ3DML.png'}">
+      <h3 style="margin:4px 0">${escape(m.title)}</h3>
+      <div style="color:var(--muted); font-size:13px;">${escape(m.desc||"")}</div>
+
+      <div style="margin-top:8px">
+        Status: <b>${m.status==="done"?"Obejrzane":"Do obejrzenia"}</b>
+      </div>
+
+      ${m.rate ? `<div>Ocena: ⭐ ${m.rate}/10</div>` : ""}
+
+      ${m.link ? `<a href="${m.link}" target="_blank" style="color:var(--accent)">Otwórz film</a>` : ""}
+
+      <div style="display:flex; gap:10px; margin-top:10px">
+        <button class="btn" style="background:#333" onclick="editMovie('${m.id}')">Edytuj</button>
+        <button class="btn" style="background:#5f0000" onclick="deleteMovie('${m.id}')">Usuń</button>
+      </div>
+    `;
+
+    box.appendChild(div);
+  });
+}
+
+// ---------------- MODAL ----------------
+const modalBg = document.getElementById("modalBg");
+let editId = null;
+
+document.getElementById("addMovieBtn").onclick = () => openModal();
+
+function openModal(m=null){
+  modalBg.style.display = "flex";
+  editId = m ? m.id : null;
+
+  document.getElementById("modalTitle").textContent = editId ? "Edytuj film" : "Dodaj film";
+
+  document.getElementById("mTitle").value = m?.title || "";
+  document.getElementById("mDesc").value = m?.desc || "";
+  document.getElementById("mImg").value = m?.img || "";
+  document.getElementById("mLink").value = m?.link || "";
+  document.getElementById("mStatus").value = m?.status || "todo";
+  document.getElementById("mRate").value = m?.rate || "";
+}
+function closeModal(){
+  modalBg.style.display = "none";
+}
+
+// ---------------- SAVE MOVIE ----------------
+async function saveMovie(){
+  const title = document.getElementById("mTitle").value.trim();
+  if (!title) return alert("Wpisz tytuł!");
+
+  const data = {
+    title,
+    desc: document.getElementById("mDesc").value.trim(),
+    img: document.getElementById("mImg").value.trim(),
+    link: document.getElementById("mLink").value.trim(),
+    status: document.getElementById("mStatus").value,
+    rate: document.getElementById("mRate").value,
+    profileId,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+
+  try{
+    if (editId){
+      await db.collection("movies").doc(editId).set(data,{merge:true});
+    } else {
+      data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+      await db.collection("movies").add(data);
+    }
+    closeModal();
+  } catch(e){
+    alert("Błąd zapisu: "+e.message);
+  }
+}
+
+// ---------------- EDIT/DELETE ----------------
+function editMovie(id){
+  const m = movies.find(x => x.id === id);
+  openModal(m);
+}
+async function deleteMovie(id){
+  if (!confirm("Na pewno usunąć?")) return;
+  await db.collection("movies").doc(id).delete();
+}
+
+// ---------------- FILTERS ----------------
+document.querySelectorAll(".filter-btn").forEach(btn=>{
+  btn.onclick=()=>{
+    document.querySelectorAll(".filter-btn").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+    renderMovies();
+  }
+});
+document.getElementById("sortSelect").onchange = renderMovies;
+
+// ---------------- HELPERS ----------------
+function escape(t=""){ return t.replace(/[&<>]/g, m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m])); }
+function shade(hex,percent){
+  let f = parseInt(hex.slice(1),16),
+      t = percent<0 ? 0 : 255,
+      p = Math.abs(percent)/100,
+      R = f>>16,
+      G = f>>8&0x00FF,
+      B = f&0x0000FF;
+  return "#" + (0x1000000 +
+    (Math.round((t-R)*p)+R)*0x10000 +
+    (Math.round((t-G)*p)+G)*0x100 +
+    (Math.round((t-B)*p)+B)
+  ).toString(16).slice(1);
+}
+
+</script>
+</body>
+</html>
